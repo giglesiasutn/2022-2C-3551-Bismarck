@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Reflection;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -63,9 +64,9 @@ namespace TGC.MonoGame.TP
 
             // Configuramos nuestras matrices de la escena.
             World = Matrix.Identity;
-            View = Matrix.CreateLookAt(Vector3.UnitZ * 150, Vector3.Zero, Vector3.Up);
+            View = Matrix.CreateLookAt(Vector3.UnitZ * 250, Vector3.Zero, Vector3.Up);
             Projection =
-                Matrix.CreatePerspectiveFieldOfView(MathHelper.PiOver4, GraphicsDevice.Viewport.AspectRatio, 1, 250);
+                Matrix.CreatePerspectiveFieldOfView(MathHelper.PiOver4, GraphicsDevice.Viewport.AspectRatio, 1, 550);
 
             base.Initialize();
         }
@@ -81,21 +82,23 @@ namespace TGC.MonoGame.TP
             SpriteBatch = new SpriteBatch(GraphicsDevice);
 
             // Cargo el modelo del logo.
-            //Model = Content.Load<Model>(ContentFolder3D + "tgc-logo/tgc-logo");
+            IslandModel = Content.Load<Model>(ContentFolder3D + "Ship/Ship");
+            //IslandModel = Content.Load<Model>(ContentFolder3D + "Ship/car");
 
             // Cargo un efecto basico propio declarado en el Content pipeline.
             // En el juego no pueden usar BasicEffect de MG, deben usar siempre efectos propios.
             Effect = Content.Load<Effect>(ContentFolderEffects + "BasicShader");
 
 
-            IslandModel = Content.Load<Model>(ContentFolder3D + "Island1/Island1");
+            //IslandModel = Content.Load<Model>(ContentFolder3D + "Ship");
 
             // Asigno el efecto que cargue a cada parte del mesh.
             // Un modelo puede tener mas de 1 mesh internamente.
-            //foreach (var mesh in Model.Meshes)
+            /*foreach (var mesh in IslandModel.Meshes)
                 // Un mesh puede tener mas de 1 mesh part (cada 1 puede tener su propio efecto).
-           // foreach (var meshPart in mesh.MeshParts)
-             //   meshPart.Effect = Effect;
+            foreach (var meshPart in mesh.MeshParts)
+                meshPart.Effect = Effect;*/
+            //foreach (var mesh in IslandModel.Meshes) ((BasicEffect)mesh.Effects.FirstOrDefault())?.EnableDefaultLighting();
 
             base.LoadContent();
         }
@@ -132,19 +135,20 @@ namespace TGC.MonoGame.TP
             // Para dibujar le modelo necesitamos pasarle informacion que el efecto esta esperando.
             Effect.Parameters["View"].SetValue(View);
             Effect.Parameters["Projection"].SetValue(Projection);
-            Effect.Parameters["DiffuseColor"].SetValue(Color.DarkBlue.ToVector3());
+            Effect.Parameters["DiffuseColor"].SetValue(Color.Beige.ToVector3());
             var rotationMatrix = Matrix.CreateRotationY(Rotation);
-            IslandModel.Draw(World,View,Projection);
+            //IslandModel.Draw(World,View,Projection);
+            IslandModel.Draw(Matrix.CreateScale(0.01f)*rotationMatrix, View, Projection);
 
 
-            /*
-            foreach (var mesh in Model.Meshes)
+            /*foreach (var mesh in IslandModel.Meshes)
             {
-                World = mesh.ParentBone.Transform * rotationMatrix;
-                Effect.Parameters["World"].SetValue(World);
+                World = mesh.ParentBone.Transform * Matrix.CreateScale(0.01f) * rotationMatrix;
+                //Effect.Parameters["World"].SetValue(World);
+                
                 mesh.Draw();
-            }
-            */
+            }*/
+
         }
 
         /// <summary>
