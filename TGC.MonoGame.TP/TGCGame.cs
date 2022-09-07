@@ -20,6 +20,11 @@ namespace TGC.MonoGame.TP
         public const string ContentFolderSpriteFonts = "SpriteFonts/";
         public const string ContentFolderTextures = "Textures/";
 
+        public const float CarMaxSpeed = 20.0f;
+        public const float CarMinSpeed = -10.0f; //Negativo para que tenga reversa
+        public const float CarAcceleration = 4.0f;
+        public const float CargAngularSpeed = (float)Math.PI / 4;
+
         /// <summary>
         ///     Constructor del juego.
         /// </summary>
@@ -37,14 +42,17 @@ namespace TGC.MonoGame.TP
 
         private GraphicsDeviceManager Graphics { get; }
         private SpriteBatch SpriteBatch { get; set; }
-        private Model Model { get; set; }
+        private Model ShipModel { get; set; }
         private Effect Effect { get; set; }
         private float Rotation { get; set; }
-        private Matrix World { get; set; }
+        private Matrix ShipWorld { get; set; }
         private Matrix View { get; set; }
         private Matrix Projection { get; set; }
 
-        private Model IslandModel { get; set; }
+        private Model seaModel { get; set; }
+        private FollowCamera FollowCamera { get; set; }
+        private float CarCurrentSpeed;
+        private float rotationY;
 
         /// <summary>
         ///     Se llama una sola vez, al principio cuando se ejecuta el ejemplo.
@@ -63,10 +71,17 @@ namespace TGC.MonoGame.TP
             // Seria hasta aca.
 
             // Configuramos nuestras matrices de la escena.
-            World = Matrix.Identity;
+            ShipWorld = Matrix.Identity;
             View = Matrix.CreateLookAt(Vector3.UnitZ * 250, Vector3.Zero, Vector3.Up);
             Projection =
                 Matrix.CreatePerspectiveFieldOfView(MathHelper.PiOver4, GraphicsDevice.Viewport.AspectRatio, 1, 550);
+            // Creo una camara para seguir a nuestro auto
+            FollowCamera = new FollowCamera(GraphicsDevice.Viewport.AspectRatio);
+
+            // Inicializo velocidad
+            /*CarCurrentSpeed = 0;
+            rotationY = 0.0f;
+            isJumping = false;*/
 
             base.Initialize();
         }
@@ -82,23 +97,13 @@ namespace TGC.MonoGame.TP
             SpriteBatch = new SpriteBatch(GraphicsDevice);
 
             // Cargo el modelo del logo.
-            IslandModel = Content.Load<Model>(ContentFolder3D + "Ship/Ship");
-            //IslandModel = Content.Load<Model>(ContentFolder3D + "Ship/car");
-
+            ShipModel = Content.Load<Model>(ContentFolder3D + "Ship/Ship");
+            seaModel = Content.Load<Model>(ContentFolder3D + "Sea/sea_escenario_with_texture");
+            
             // Cargo un efecto basico propio declarado en el Content pipeline.
             // En el juego no pueden usar BasicEffect de MG, deben usar siempre efectos propios.
             Effect = Content.Load<Effect>(ContentFolderEffects + "BasicShader");
-
-
-            //IslandModel = Content.Load<Model>(ContentFolder3D + "Ship");
-
-            // Asigno el efecto que cargue a cada parte del mesh.
-            // Un modelo puede tener mas de 1 mesh internamente.
-            /*foreach (var mesh in IslandModel.Meshes)
-                // Un mesh puede tener mas de 1 mesh part (cada 1 puede tener su propio efecto).
-            foreach (var meshPart in mesh.MeshParts)
-                meshPart.Effect = Effect;*/
-            //foreach (var mesh in IslandModel.Meshes) ((BasicEffect)mesh.Effects.FirstOrDefault())?.EnableDefaultLighting();
+            ShipWorld = Matrix.CreateScale(0.05f);
 
             base.LoadContent();
         }
@@ -119,7 +124,47 @@ namespace TGC.MonoGame.TP
 
             // Basado en el tiempo que paso se va generando una rotacion.
             Rotation += Convert.ToSingle(gameTime.ElapsedGameTime.TotalSeconds);
+            var rotationMatrix = Matrix.CreateRotationY(Rotation);
+            ShipWorld = Matrix.CreateScale(0.05f) * rotationMatrix;
+            // Actualizo la camara, enviandole la matriz de mundo del auto
+            FollowCamera.Update(gameTime, ShipWorld);
 
+            //Movimiento
+            /*
+            float elapsedTime = Convert.ToSingle(gameTime.ElapsedGameTime.TotalSeconds);
+            Vector3 previousPosition = CarWorld.Translation;
+
+            //Giros
+            if (keyboardState.IsKeyDown(Keys.D))
+                rotationY += CargAngularSpeed * elapsedTime * -1.0f * CarCurrentSpeed / 4;
+            if (keyboardState.IsKeyDown(Keys.A))
+                rotationY += CargAngularSpeed * elapsedTime * CarCurrentSpeed / 4;
+
+            CarWorld = Matrix.CreateRotationY(rotationY);
+
+            //Aceleracion y desaleracion (+marcha atras)
+            if (keyboardState.IsKeyDown(Keys.W))
+                CarCurrentSpeed += CarAcceleration * elapsedTime;
+            else if (keyboardState.IsKeyDown(Keys.S))
+                CarCurrentSpeed -= CarAcceleration * elapsedTime;
+            else
+            {
+                //Para que desacelere solo al dejar de avanzar o retroceder
+                if (CarCurrentSpeed > 0)
+                    CarCurrentSpeed -= CarAcceleration * elapsedTime;
+                else if (CarCurrentSpeed < 0)
+                    CarCurrentSpeed += CarAcceleration * elapsedTime;
+            }
+
+            if (CarCurrentSpeed > CarMaxSpeed)
+                CarCurrentSpeed = CarMaxSpeed;
+            if (CarCurrentSpeed < CarMinSpeed)
+                CarCurrentSpeed = CarMinSpeed;
+
+            Vector3 movement = CarWorld.Forward * CarCurrentSpeed;
+
+            ShipWorld = ShipWorld * Matrix.CreateTranslation(previousPosition + movement);
+            */
             base.Update(gameTime);
         }
 
@@ -130,25 +175,15 @@ namespace TGC.MonoGame.TP
         protected override void Draw(GameTime gameTime)
         {
             // Aca deberiamos poner toda la logia de renderizado del juego.
-            GraphicsDevice.Clear(Color.Black);
+            GraphicsDevice.Clear(Color.Cyan);
 
             // Para dibujar le modelo necesitamos pasarle informacion que el efecto esta esperando.
-            Effect.Parameters["View"].SetValue(View);
-            Effect.Parameters["Projection"].SetValue(Projection);
+            Effect.Parameters["View"].SetValue(FollowCamera.View);
+            Effect.Parameters["Projection"].SetValue(FollowCamera.Projection);
             Effect.Parameters["DiffuseColor"].SetValue(Color.Beige.ToVector3());
-            var rotationMatrix = Matrix.CreateRotationY(Rotation);
-            //IslandModel.Draw(World,View,Projection);
-            IslandModel.Draw(Matrix.CreateScale(0.01f)*rotationMatrix, View, Projection);
 
-
-            /*foreach (var mesh in IslandModel.Meshes)
-            {
-                World = mesh.ParentBone.Transform * Matrix.CreateScale(0.01f) * rotationMatrix;
-                //Effect.Parameters["World"].SetValue(World);
-                
-                mesh.Draw();
-            }*/
-
+            ShipModel.Draw(ShipWorld, FollowCamera.View, FollowCamera.Projection);
+            seaModel.Draw(Matrix.CreateScale(10), FollowCamera.View, FollowCamera.Projection);
         }
 
         /// <summary>
