@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using BepuPhysics;
+using Bismarck;
 using Bismarck.Cameras;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -64,7 +66,11 @@ namespace TGC.MonoGame.TP
         private FollowCamera FollowCamera { get; set; }
 
         private List<Matrix> IslandWords = new List<Matrix>();
+
         private List<Matrix> ShipsBWords = new List<Matrix>();
+
+        private List<MatrixModel> MundoMatrixModel = new List<MatrixModel>();
+
         private Camera TestCamera { get; set; }
         private VertexBuffer seaVertexBuffer { get; set; }
         private IndexBuffer seaVertexIndex { get; set; }
@@ -116,8 +122,11 @@ namespace TGC.MonoGame.TP
         {
             // Cargo el modelos a utilizar
             loadModels();
-            loadIslands();
-            loadShips();
+            loadModeloMatrix(IslandModel,20);
+            loadModeloMatrix(IslandModel2, 20);
+            loadModeloMatrix(IslandModel3, 20);
+            loadModeloMatrix(ShipBModel, 40);
+            //loadShips();
             loadSea();
 
             ShipWorld = Matrix.CreateScale(0.05f) * Matrix.CreateRotationX(180);
@@ -166,24 +175,57 @@ namespace TGC.MonoGame.TP
                    center.Z - squareSize <= z && center.Z + squareSize >= z;
         }
 
-        private void loadIslands()
+        private void loadModeloMatrix(Model modeloAgregar, int cantidad)
         {
             // Cargo Islands en lugares aleatorios no repetidos
             Random r = new Random();
-            for (int i = 0; i < 60; i++)
+            float y = IslandInitialY;  //Fijo en Y
+            for (int i = 0; i < cantidad; i++)
             {
-                while (true)
+                if (MundoMatrixModel.Count > 0)
+                {
+                    bool colisiona = true;
+                    while (colisiona)
+                    {
+                        float x = r.Next(-MapSize, MapSize);
+                        float z = r.Next(-MapSize, MapSize);
+
+                        var posicionNueva = new Vector3(x, y, z);
+                        BoundingBox OneBox = BoundingVolumesExtensions.CreateAABBFrom(modeloAgregar);
+                        OneBox = new BoundingBox(OneBox.Min + posicionNueva, OneBox.Max + posicionNueva);
+
+                        foreach (MatrixModel mudoMatrixModel in MundoMatrixModel)
+                        {
+                            Matrix matrixExistente = mudoMatrixModel.Matrix;
+                            Model modelExistente = mudoMatrixModel.Model;
+
+                            Vector3 posicionIslaActual = new Vector3(matrixExistente.Translation.X, matrixExistente.Translation.Y, matrixExistente.Translation.Z);
+                            BoundingBox TwoBox = BoundingVolumesExtensions.CreateAABBFrom(modelExistente);
+
+                            TwoBox = new BoundingBox(TwoBox.Min + posicionIslaActual, TwoBox.Max + posicionIslaActual);
+                            colisiona = OneBox.Intersects(TwoBox);
+                            if (colisiona)
+                                break;  //Salgo ante la primer colision
+
+                        }
+                        if (!colisiona)
+                        {
+                            Matrix nMatrix;
+                            nMatrix = Matrix.Identity * Matrix.CreateTranslation(posicionNueva);
+                            MatrixModel newMatrixModel = new MatrixModel(nMatrix, modeloAgregar);
+                            MundoMatrixModel.Add(newMatrixModel);
+                        }
+                    }
+                } else
                 {
                     float x = r.Next(-MapSize, MapSize);
-                    float y = IslandInitialY;  //Fijo en Y
                     float z = r.Next(-MapSize, MapSize);
-                    if (!IslandWords.Exists(island => isInSquare(island.Translation, IslandSize, x, z)) &&
-                        !isInSquare(ShipWorld.Translation, ShipSize, x, z))
-                    {
-                        IslandWords.Add(Matrix.Identity * Matrix.CreateTranslation(new Vector3(x, y, z)));
-                        break;
-                    }
-                }
+                    var posicionNueva = new Vector3(x, y, z);
+                    Matrix nMatrix;
+                    nMatrix = Matrix.Identity * Matrix.CreateTranslation(posicionNueva);
+                    MatrixModel newMatrixModel = new MatrixModel(nMatrix, modeloAgregar);
+                    MundoMatrixModel.Add(newMatrixModel);
+                }            
             }
         }
 
@@ -292,7 +334,7 @@ namespace TGC.MonoGame.TP
             drawSea();
 
             ShipModel.Draw(ShipWorld, FollowCamera.View, FollowCamera.Projection);
-
+            /*
             Model drawModel = IslandModel;
             int i = 0;
             foreach (Matrix IslandWord in IslandWords)
@@ -309,6 +351,17 @@ namespace TGC.MonoGame.TP
             {
                 ShipBModel.Draw(ShipsBWord * Matrix.CreateScale(0.6f), FollowCamera.View, FollowCamera.Projection);
             }
+            */
+            float escala = 0.3f;
+            foreach (MatrixModel mudoMatrixModel in MundoMatrixModel)
+            {
+                Matrix matrixExistente = mudoMatrixModel.Matrix;
+                Model modelExistente = mudoMatrixModel.Model;
+                if (modelExistente == ShipBModel)
+                    escala = 0.6f;
+                modelExistente.Draw(matrixExistente * Matrix.CreateScale(escala), FollowCamera.View, FollowCamera.Projection);
+            }
+
         }
 
         private void drawSea()
