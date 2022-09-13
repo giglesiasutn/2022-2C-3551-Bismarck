@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Bismarck.Cameras;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -29,6 +30,8 @@ namespace TGC.MonoGame.TP
         public const float CarAcceleration = 4.0f;
         public const float CargAngularSpeed = (float)Math.PI / 4;
 
+        public const float IslandSize = 20000;
+        public const float ShipSize = 1000;
         /// <summary>
         ///     Constructor del juego.
         /// </summary>
@@ -56,11 +59,16 @@ namespace TGC.MonoGame.TP
         private Model ShipBModel { get; set; }
         private Model seaModel { get; set; }
         private Model IslandModel { get; set; }
+        private Model IslandModel2 { get; set; }
+        private Model IslandModel3 { get; set; }
         private FollowCamera FollowCamera { get; set; }
 
         private List<Matrix> IslandWords = new List<Matrix>();
         private List<Matrix> ShipsBWords = new List<Matrix>();
         private Camera TestCamera { get; set; }
+        private VertexBuffer seaVertexBuffer { get; set; }
+        private IndexBuffer seaVertexIndex { get; set; }
+        private BasicEffect basicEffect { get; set; }
 
 
         private float CarCurrentSpeed;
@@ -113,80 +121,12 @@ namespace TGC.MonoGame.TP
             SpriteBatch = new SpriteBatch(GraphicsDevice);
 
             // Cargo el modelo del logo.
-            ShipModel = Content.Load<Model>(ContentFolder3D + "Ship/Ship");
-            ShipBModel = Content.Load<Model>(ContentFolder3D + "ShipB/Source/Ship");
-            IslandModel = Content.Load<Model>(ContentFolder3D + "Island1/Island1");
-            seaModel = Content.Load<Model>(ContentFolder3D + "Sea/sea_escenario_with_texture");
+            loadModels();
 
+            loadIslands();
 
-            // Cargo Islands en lugares aleatorios no repetidos
-            Random r = new Random();
-            IslandWords.Add(Matrix.Identity * Matrix.CreateTranslation(new Vector3(0, 0, 0)));
-            for (int i = 0; i < 60; i++)
-            {
-                //Cambio los modelos cada 20
-                if (i == 20)
-                    IslandModel = Content.Load<Model>(ContentFolder3D + "Island2/Island2");
-                if (i == 40)
-                    IslandModel = Content.Load<Model>(ContentFolder3D + "Island2/Island2");
-
-                bool vacio = true;
-                while (vacio)
-                {
-                    
-                    float x = r.Next(0, 200000);
-                    float y = 0;  //Fijo en Y
-                    float z = r.Next(0, 200000);
-                    foreach (Matrix IslandWord in IslandWords)
-                    {
-                        vacio = true;
-                        if (IslandWord.Translation.X == x || IslandWord.Translation.Z == z) {
-                            vacio = false;
-                            break;
-                        }
-                    }
-                    if (vacio == true) {
-                        IslandWords.Add(Matrix.Identity * Matrix.CreateTranslation(new Vector3(x, y, z)));
-                        vacio = false; //Salgo del bucle hay que mejorar esto
-                    }
-
-                }
-            }
-            // Cargo Ships en posiciones aleatorias
-             
-            ShipsBWords.Add(Matrix.Identity * Matrix.CreateTranslation(new Vector3(r.Next(1000, 200000), 0, r.Next(1000, 200000))));
-
-            List<Matrix> WordsTotal = new List<Matrix>(IslandWords);
-
-            for (int i = 0; i < 40; i++)
-            {
-                bool vacio = true;
-                while (vacio)
-                {
-
-                    float x = r.Next(0, 50000);
-                    float y = 0;  //Fijo en Y
-                    float z = r.Next(0, 50000);
-                    //Verifico aqui, con el total de vectores posiciones en el mundo (islas y luego islas y barcos)
-                    foreach (Matrix ShipsBWord in WordsTotal)
-                    {
-                        vacio = true;
-                        if (ShipsBWord.Translation.X == x || ShipsBWord.Translation.Z == z)
-                        {
-                            vacio = false;
-                            break;
-                        }
-                    }
-                    if (vacio == true)
-                    {
-                        ShipsBWords.Add(Matrix.Identity * Matrix.CreateTranslation(new Vector3(x, y, z)));
-                        WordsTotal.Add(Matrix.Identity * Matrix.CreateTranslation(new Vector3(x, y, z)));
-                        vacio = false; //Salgo del bucle hay que mejorar esto
-                    }
-
-                }
-            }
-
+            loadShips();
+            //loadSea();
 
             // Cargo un efecto basico propio declarado en el Content pipeline.
             // En el juego no pueden usar BasicEffect de MG, deben usar siempre efectos propios.
@@ -194,6 +134,97 @@ namespace TGC.MonoGame.TP
             ShipWorld = Matrix.CreateScale(0.05f);
 
             base.LoadContent();
+        }
+        
+        private void loadModels() {
+            ShipModel = Content.Load<Model>(ContentFolder3D + "Ship/Ship");
+            ShipBModel = Content.Load<Model>(ContentFolder3D + "ShipB/Source/Ship");
+            IslandModel = Content.Load<Model>(ContentFolder3D + "Island1/Island1");
+            IslandModel2 = Content.Load<Model>(ContentFolder3D + "Island2/Island2");
+            IslandModel3 = Content.Load<Model>(ContentFolder3D + "Island3/Island3");
+            seaModel = Content.Load<Model>(ContentFolder3D + "Sea/sea_escenario_with_texture");
+        }
+
+        private void loadSea()
+        {
+            var triangleVertices = new[]
+            {
+                new VertexPositionColor(new Vector3(-1000, 0, -1000), Color.Blue),
+                new VertexPositionColor(new Vector3(-1000, 0, 1000), Color.Blue),
+                new VertexPositionColor(new Vector3(1000, 0, -1000), Color.Blue),
+                new VertexPositionColor(new Vector3(1000, 0, -1000), Color.Blue),
+                new VertexPositionColor(new Vector3(-1000, 0, 1000), Color.Blue),
+                new VertexPositionColor(new Vector3(1000, 0, 1000), Color.Blue)
+            };
+            basicEffect = new BasicEffect(GraphicsDevice);
+            basicEffect.World = Matrix.CreateOrthographicOffCenter(
+                0, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height, 0, 0, 1);
+
+            seaVertexBuffer = new VertexBuffer(GraphicsDevice, VertexPositionColor.VertexDeclaration, triangleVertices.Length,
+                BufferUsage.WriteOnly);
+            seaVertexBuffer.SetData(triangleVertices);
+
+            // Array of indices
+            var triangleIndices = new ushort[]
+            {
+                0, 1, 2, 3, 4, 5
+            };
+
+            seaVertexIndex = new IndexBuffer(GraphicsDevice, IndexElementSize.SixteenBits, 3, BufferUsage.None);
+            seaVertexIndex.SetData(triangleIndices);
+        }
+
+        private bool isInSquare(Vector3 center, float squareSize, float x, float z)
+        {
+            return center.X - squareSize <= x && center.X + squareSize >= x &&
+                   center.Z - squareSize <= z && center.Z + squareSize >= z;
+        }
+
+        private void loadIslands()
+        {
+            // Cargo Islands en lugares aleatorios no repetidos
+            Random r = new Random();
+            for (int i = 0; i < 60; i++)
+            {
+                while (true)
+                {
+                    float x = r.Next(-200000, 200000);
+                    float y = 0;  //Fijo en Y
+                    float z = r.Next(-200000, 200000);
+                    if (!IslandWords.Exists(island => isInSquare(island.Translation, IslandSize, x, z)) &&
+                        !isInSquare(ShipWorld.Translation, ShipSize, x, z))
+                    {
+                        IslandWords.Add(Matrix.Identity * Matrix.CreateTranslation(new Vector3(x, y, z)));
+                        break;
+                    }
+                }
+            }
+        }
+
+        private void loadShips()
+        {
+            // Cargo Ships en posiciones aleatorias
+            Random r = new Random();
+            List<Matrix> WordsTotal = new List<Matrix>(IslandWords);
+
+            for (int i = 0; i < 40; i++)
+            {
+                while (true)
+                {
+                    float x = r.Next(-200000, 200000);
+                    float y = 0;  //Fijo en Y
+                    float z = r.Next(-200000, 200000);
+                    //Verifico aqui, con el total de vectores posiciones en el mundo (islas y luego islas y barcos)
+                    if (!IslandWords.Exists(island => isInSquare(island.Translation, IslandSize, x, z)) &&
+                        !ShipsBWords.Exists(ship => isInSquare(ship.Translation, ShipSize, x, z)) &&
+                        !isInSquare(ShipWorld.Translation, ShipSize, x, z))
+                    {
+                        ShipsBWords.Add(Matrix.Identity * Matrix.CreateTranslation(new Vector3(x, y, z)));
+                        WordsTotal.Add(Matrix.Identity * Matrix.CreateTranslation(new Vector3(x, y, z)));
+                        break;
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -236,16 +267,49 @@ namespace TGC.MonoGame.TP
             //ShipModel.Draw(ShipWorld, FollowCamera.View, FollowCamera.Projection);
             ShipModel.Draw(ShipWorld, TestCamera.View, TestCamera.Projection);
 
+            Model drawModel = IslandModel;
+            int i = 0;
             foreach (Matrix IslandWord in IslandWords)
             {
-                IslandModel.Draw(IslandWord * Matrix.CreateScale(0.3f), TestCamera.View, TestCamera.Projection);
+                if (i == 20)
+                    drawModel = IslandModel2;
+                else if (i == 40)
+                    drawModel = IslandModel3;
+
+                drawModel.Draw(IslandWord * Matrix.CreateScale(0.3f), TestCamera.View, TestCamera.Projection);
+                i++;
             }
             foreach (Matrix ShipsBWord in ShipsBWords)
             {
                 ShipBModel.Draw(ShipsBWord * Matrix.CreateScale(0.6f), TestCamera.View, TestCamera.Projection);
             }
-
+            
+            //drawSea();
             seaModel.Draw(Matrix.CreateScale(10), TestCamera.View, TestCamera.Projection);
+        }
+
+        private void drawSea()
+        {
+            GraphicsDevice.SetVertexBuffer(seaVertexBuffer);
+
+            // Set our index buffer
+            GraphicsDevice.Indices = seaVertexIndex;
+            EffectTechnique effectTechnique = basicEffect.Techniques[0];
+            EffectPassCollection effectPassCollection = effectTechnique.Passes;
+            foreach (EffectPass pass in effectPassCollection)
+            {
+                pass.Apply();
+
+                GraphicsDevice.DrawIndexedPrimitives(
+                        // We’ll be rendering one triangles.
+                        PrimitiveType.TriangleList,
+                        // The offset, which is 0 since we want to start at the beginning of the Vertices array.
+                        0,
+                        // The start index in the Vertices array.
+                        0,
+                        // The number of triangles to draw.
+                        2);
+            }
         }
 
         /// <summary>
