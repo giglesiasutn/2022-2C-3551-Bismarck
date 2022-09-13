@@ -25,11 +25,12 @@ namespace TGC.MonoGame.TP
         public const string ContentFolderSpriteFonts = "SpriteFonts/";
         public const string ContentFolderTextures = "Textures/";
 
-        public const float CarMaxSpeed = 20.0f;
-        public const float CarMinSpeed = -10.0f; //Negativo para que tenga reversa
-        public const float CarAcceleration = 4.0f;
-        public const float CargAngularSpeed = (float)Math.PI / 4;
+        public const float ShipMaxSpeed = 400.0f;
+        public const float ShipMinSpeed = -200.0f; //Negativo para que tenga reversa
+        public const float ShipAcceleration = 80.0f;
+        public const float ShipAngularSpeed = (float)Math.PI / 64/32;
 
+        public const float IslandInitialY = 220;
         public const float IslandSize = 15000;
         public const float ShipSize = 5000;
         public const Int32 MapSize = 100000;
@@ -49,13 +50,10 @@ namespace TGC.MonoGame.TP
         }
 
         private GraphicsDeviceManager Graphics { get; }
-        private SpriteBatch SpriteBatch { get; set; }
         private Model ShipModel { get; set; }
         private BasicEffect Effect { get; set; }
         private float Rotation { get; set; }
         private Matrix ShipWorld { get; set; }
-        private Matrix View { get; set; }
-        private Matrix Projection { get; set; }
 
         private Model ShipBModel { get; set; }
         private Model seaModel { get; set; }
@@ -71,7 +69,7 @@ namespace TGC.MonoGame.TP
         private IndexBuffer seaVertexIndex { get; set; }
 
 
-        private float CarCurrentSpeed;
+        private float ShipCurrentSpeed;
         private float rotationY;
 
         /// <summary>
@@ -81,7 +79,9 @@ namespace TGC.MonoGame.TP
         protected override void Initialize()
         {
             // La logica de inicializacion que no depende del contenido se recomienda poner en este metodo.
-
+            Graphics.PreferredBackBufferWidth = GraphicsAdapter.DefaultAdapter.CurrentDisplayMode.Width - 100;
+            Graphics.PreferredBackBufferHeight = GraphicsAdapter.DefaultAdapter.CurrentDisplayMode.Height - 100;
+            Graphics.ApplyChanges();
             // Apago el backface culling.
             // Esto se hace por un problema en el diseno del modelo del logo de la materia.
             // Una vez que empiecen su juego, esto no es mas necesario y lo pueden sacar.
@@ -92,20 +92,16 @@ namespace TGC.MonoGame.TP
 
             // Configuramos nuestras matrices de la escena.
             ShipWorld = Matrix.Identity;
-            View = Matrix.CreateLookAt(Vector3.UnitZ * 5000, Vector3.Zero, Vector3.Up);
-            Projection =
-                Matrix.CreatePerspectiveFieldOfView(MathHelper.PiOver4, GraphicsDevice.Viewport.AspectRatio, 1, 500);
             // Creo una camara para seguir a nuestro varco
             FollowCamera = new FollowCamera(GraphicsDevice.Viewport.AspectRatio);
-            var size = GraphicsDevice.Viewport.Bounds.Size;
+            /*var size = GraphicsDevice.Viewport.Bounds.Size;
             size.X /= 2;
             size.Y /= 2;
-            TestCamera = new FreeCamera(GraphicsDevice.Viewport.AspectRatio, new Vector3(0, 50, 1000), size);
+            TestCamera = new FreeCamera(GraphicsDevice.Viewport.AspectRatio, new Vector3(0, 50, 1000), size);*/
 
             // Inicializo velocidad
-            /*CarCurrentSpeed = 0;
+            ShipCurrentSpeed = 0;
             rotationY = 0.0f;
-            isJumping = false;*/
 
             base.Initialize();
         }
@@ -117,16 +113,10 @@ namespace TGC.MonoGame.TP
         /// </summary>
         protected override void LoadContent()
         {
-            // Aca es donde deberiamos cargar todos los contenido necesarios antes de iniciar el juego.
-            SpriteBatch = new SpriteBatch(GraphicsDevice);
-
-            // Cargo el modelo del logo.
+            // Cargo el modelos a utilizar
             loadModels();
-
             loadIslands();
-
             loadShips();
-
             loadSea();
 
             ShipWorld = Matrix.CreateScale(0.05f);
@@ -149,10 +139,10 @@ namespace TGC.MonoGame.TP
             Effect.VertexColorEnabled = true;
             var triangleVertices = new[]
             {
-                new VertexPositionColor(new Vector3(-MapSize, -100, -MapSize), Color.Blue),
-                new VertexPositionColor(new Vector3(-MapSize, -100, MapSize), Color.Blue),
-                new VertexPositionColor(new Vector3(MapSize, -100, -MapSize), Color.Blue),
-                new VertexPositionColor(new Vector3(MapSize, -100, MapSize), Color.Blue)
+                new VertexPositionColor(new Vector3(-MapSize, 0, -MapSize), Color.Blue),
+                new VertexPositionColor(new Vector3(-MapSize, 0, MapSize), Color.Blue),
+                new VertexPositionColor(new Vector3(MapSize, 0, -MapSize), Color.Blue),
+                new VertexPositionColor(new Vector3(MapSize, 0, MapSize), Color.Blue)
             };
 
             seaVertexBuffer = new VertexBuffer(GraphicsDevice, VertexPositionColor.VertexDeclaration, triangleVertices.Length,
@@ -184,7 +174,7 @@ namespace TGC.MonoGame.TP
                 while (true)
                 {
                     float x = r.Next(-MapSize, MapSize);
-                    float y = 0;  //Fijo en Y
+                    float y = IslandInitialY;  //Fijo en Y
                     float z = r.Next(-MapSize, MapSize);
                     if (!IslandWords.Exists(island => isInSquare(island.Translation, IslandSize, x, z)) &&
                         !isInSquare(ShipWorld.Translation, ShipSize, x, z))
@@ -230,19 +220,63 @@ namespace TGC.MonoGame.TP
         protected override void Update(GameTime gameTime)
         {
             // Aca deberiamos poner toda la logica de actualizacion del juego.
-            TestCamera.Update(gameTime);
+            //TestCamera.Update(gameTime);
             // Capturar Input teclado
             if (Keyboard.GetState().IsKeyDown(Keys.Escape))
                 //Salgo del juego.
                 Exit();
 
             // Basado en el tiempo que paso se va generando una rotacion.
-            Rotation += Convert.ToSingle(gameTime.ElapsedGameTime.TotalSeconds);
+            /*Rotation += Convert.ToSingle(gameTime.ElapsedGameTime.TotalSeconds);
             var rotationMatrix = Matrix.CreateRotationY(Rotation);
-            ShipWorld = Matrix.CreateScale(0.05f) * rotationMatrix ;
+            ShipWorld = Matrix.CreateScale(0.05f) * rotationMatrix ;*/
+            shipMovement(gameTime);
 
+            FollowCamera.Update(gameTime, ShipWorld);
 
             base.Update(gameTime);
+        }
+
+        private void shipMovement(GameTime gameTime)
+        {
+            var keyboardState = Keyboard.GetState();
+
+            // La logica debe ir aca
+            float elapsedTime = Convert.ToSingle(gameTime.ElapsedGameTime.TotalSeconds);
+            Vector3 previousPosition = ShipWorld.Translation;
+            //previousPosition.Y = IslandInitialY; //Prueba para que no titile el barco
+
+            //Giros
+            if (keyboardState.IsKeyDown(Keys.D))
+                rotationY += ShipAngularSpeed * elapsedTime * -1.0f * ShipCurrentSpeed;
+            if (keyboardState.IsKeyDown(Keys.A))
+                rotationY += ShipAngularSpeed * elapsedTime * ShipCurrentSpeed;
+
+            ShipWorld = Matrix.CreateScale(0.05f) * Matrix.CreateRotationY(rotationY);
+
+            //Aceleracion y desaleracion (+marcha atras)
+            if (keyboardState.IsKeyDown(Keys.W))
+                ShipCurrentSpeed += ShipAcceleration * elapsedTime;
+            else if (keyboardState.IsKeyDown(Keys.S))
+                ShipCurrentSpeed -= ShipAcceleration * elapsedTime;
+            else
+            {
+                //Para que desacelere solo al dejar de avanzar o retroceder
+                if (ShipCurrentSpeed > 0)
+                    ShipCurrentSpeed -= ShipAcceleration * elapsedTime;
+                else if (ShipCurrentSpeed < 0)
+                    ShipCurrentSpeed += ShipAcceleration * elapsedTime;
+            }
+
+            if (ShipCurrentSpeed > ShipMaxSpeed)
+                ShipCurrentSpeed = ShipMaxSpeed;
+            if (ShipCurrentSpeed < ShipMinSpeed)
+                ShipCurrentSpeed = ShipMinSpeed;
+
+            //TODO: Corregir. Esto deberia ser forward, el problema es que el modelo esta girado?
+            Vector3 movement = ShipWorld.Left * ShipCurrentSpeed;
+
+            ShipWorld = ShipWorld * Matrix.CreateTranslation(previousPosition + movement);
         }
 
         /// <summary>
@@ -254,7 +288,9 @@ namespace TGC.MonoGame.TP
             // Aca deberiamos poner toda la logia de renderizado del juego.
             GraphicsDevice.Clear(Color.Cyan);
 
-            ShipModel.Draw(ShipWorld, TestCamera.View, TestCamera.Projection);
+            drawSea();
+
+            ShipModel.Draw(ShipWorld, FollowCamera.View, FollowCamera.Projection);
 
             Model drawModel = IslandModel;
             int i = 0;
@@ -265,15 +301,13 @@ namespace TGC.MonoGame.TP
                 else if (i == 40)
                     drawModel = IslandModel3;
 
-                drawModel.Draw(IslandWord * Matrix.CreateScale(0.3f), TestCamera.View, TestCamera.Projection);
+                drawModel.Draw(IslandWord * Matrix.CreateScale(0.3f), FollowCamera.View, FollowCamera.Projection);
                 i++;
             }
             foreach (Matrix ShipsBWord in ShipsBWords)
             {
-                ShipBModel.Draw(ShipsBWord * Matrix.CreateScale(0.6f), TestCamera.View, TestCamera.Projection);
+                ShipBModel.Draw(ShipsBWord * Matrix.CreateScale(0.6f), FollowCamera.View, FollowCamera.Projection);
             }
-            
-            drawSea();
         }
 
         private void drawSea()
@@ -281,8 +315,8 @@ namespace TGC.MonoGame.TP
             GraphicsDevice.SetVertexBuffer(seaVertexBuffer);
             GraphicsDevice.Indices = seaVertexIndex;
             Effect.World = Matrix.Identity;
-            Effect.View = TestCamera.View;
-            Effect.Projection = TestCamera.Projection;
+            Effect.View = FollowCamera.View;
+            Effect.Projection = FollowCamera.Projection;
             foreach (EffectPass pass in Effect.CurrentTechnique.Passes)
             {
                 pass.Apply();
