@@ -30,8 +30,9 @@ namespace TGC.MonoGame.TP
         public const float CarAcceleration = 4.0f;
         public const float CargAngularSpeed = (float)Math.PI / 4;
 
-        public const float IslandSize = 20000;
-        public const float ShipSize = 1000;
+        public const float IslandSize = 15000;
+        public const float ShipSize = 5000;
+        public const Int32 MapSize = 100000;
         /// <summary>
         ///     Constructor del juego.
         /// </summary>
@@ -50,7 +51,7 @@ namespace TGC.MonoGame.TP
         private GraphicsDeviceManager Graphics { get; }
         private SpriteBatch SpriteBatch { get; set; }
         private Model ShipModel { get; set; }
-        private Effect Effect { get; set; }
+        private BasicEffect Effect { get; set; }
         private float Rotation { get; set; }
         private Matrix ShipWorld { get; set; }
         private Matrix View { get; set; }
@@ -68,7 +69,6 @@ namespace TGC.MonoGame.TP
         private Camera TestCamera { get; set; }
         private VertexBuffer seaVertexBuffer { get; set; }
         private IndexBuffer seaVertexIndex { get; set; }
-        private BasicEffect basicEffect { get; set; }
 
 
         private float CarCurrentSpeed;
@@ -126,11 +126,9 @@ namespace TGC.MonoGame.TP
             loadIslands();
 
             loadShips();
-            //loadSea();
 
-            // Cargo un efecto basico propio declarado en el Content pipeline.
-            // En el juego no pueden usar BasicEffect de MG, deben usar siempre efectos propios.
-            Effect = Content.Load<Effect>(ContentFolderEffects + "BasicShader");
+            loadSea();
+
             ShipWorld = Matrix.CreateScale(0.05f);
 
             base.LoadContent();
@@ -147,18 +145,15 @@ namespace TGC.MonoGame.TP
 
         private void loadSea()
         {
+            Effect = new BasicEffect(GraphicsDevice);
+            Effect.VertexColorEnabled = true;
             var triangleVertices = new[]
             {
-                new VertexPositionColor(new Vector3(-1000, 0, -1000), Color.Blue),
-                new VertexPositionColor(new Vector3(-1000, 0, 1000), Color.Blue),
-                new VertexPositionColor(new Vector3(1000, 0, -1000), Color.Blue),
-                new VertexPositionColor(new Vector3(1000, 0, -1000), Color.Blue),
-                new VertexPositionColor(new Vector3(-1000, 0, 1000), Color.Blue),
-                new VertexPositionColor(new Vector3(1000, 0, 1000), Color.Blue)
+                new VertexPositionColor(new Vector3(-MapSize, -100, -MapSize), Color.Blue),
+                new VertexPositionColor(new Vector3(-MapSize, -100, MapSize), Color.Blue),
+                new VertexPositionColor(new Vector3(MapSize, -100, -MapSize), Color.Blue),
+                new VertexPositionColor(new Vector3(MapSize, -100, MapSize), Color.Blue)
             };
-            basicEffect = new BasicEffect(GraphicsDevice);
-            basicEffect.World = Matrix.CreateOrthographicOffCenter(
-                0, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height, 0, 0, 1);
 
             seaVertexBuffer = new VertexBuffer(GraphicsDevice, VertexPositionColor.VertexDeclaration, triangleVertices.Length,
                 BufferUsage.WriteOnly);
@@ -167,10 +162,10 @@ namespace TGC.MonoGame.TP
             // Array of indices
             var triangleIndices = new ushort[]
             {
-                0, 1, 2, 3, 4, 5
+                0, 1, 2, 3, 1, 2
             };
 
-            seaVertexIndex = new IndexBuffer(GraphicsDevice, IndexElementSize.SixteenBits, 3, BufferUsage.None);
+            seaVertexIndex = new IndexBuffer(GraphicsDevice, IndexElementSize.SixteenBits, triangleIndices.Length, BufferUsage.None);
             seaVertexIndex.SetData(triangleIndices);
         }
 
@@ -188,9 +183,9 @@ namespace TGC.MonoGame.TP
             {
                 while (true)
                 {
-                    float x = r.Next(-200000, 200000);
+                    float x = r.Next(-MapSize, MapSize);
                     float y = 0;  //Fijo en Y
-                    float z = r.Next(-200000, 200000);
+                    float z = r.Next(-MapSize, MapSize);
                     if (!IslandWords.Exists(island => isInSquare(island.Translation, IslandSize, x, z)) &&
                         !isInSquare(ShipWorld.Translation, ShipSize, x, z))
                     {
@@ -211,9 +206,9 @@ namespace TGC.MonoGame.TP
             {
                 while (true)
                 {
-                    float x = r.Next(-200000, 200000);
+                    float x = r.Next(-MapSize, MapSize);
                     float y = 0;  //Fijo en Y
-                    float z = r.Next(-200000, 200000);
+                    float z = r.Next(-MapSize, MapSize);
                     //Verifico aqui, con el total de vectores posiciones en el mundo (islas y luego islas y barcos)
                     if (!IslandWords.Exists(island => isInSquare(island.Translation, IslandSize, x, z)) &&
                         !ShipsBWords.Exists(ship => isInSquare(ship.Translation, ShipSize, x, z)) &&
@@ -259,12 +254,6 @@ namespace TGC.MonoGame.TP
             // Aca deberiamos poner toda la logia de renderizado del juego.
             GraphicsDevice.Clear(Color.Cyan);
 
-            // Para dibujar le modelo necesitamos pasarle informacion que el efecto esta esperando.
-            Effect.Parameters["View"].SetValue(TestCamera.View);
-            Effect.Parameters["Projection"].SetValue(TestCamera.Projection);
-            Effect.Parameters["DiffuseColor"].SetValue(Color.Beige.ToVector3());
-
-            //ShipModel.Draw(ShipWorld, FollowCamera.View, FollowCamera.Projection);
             ShipModel.Draw(ShipWorld, TestCamera.View, TestCamera.Projection);
 
             Model drawModel = IslandModel;
@@ -284,31 +273,21 @@ namespace TGC.MonoGame.TP
                 ShipBModel.Draw(ShipsBWord * Matrix.CreateScale(0.6f), TestCamera.View, TestCamera.Projection);
             }
             
-            //drawSea();
-            seaModel.Draw(Matrix.CreateScale(10), TestCamera.View, TestCamera.Projection);
+            drawSea();
         }
 
         private void drawSea()
         {
             GraphicsDevice.SetVertexBuffer(seaVertexBuffer);
-
-            // Set our index buffer
             GraphicsDevice.Indices = seaVertexIndex;
-            EffectTechnique effectTechnique = basicEffect.Techniques[0];
-            EffectPassCollection effectPassCollection = effectTechnique.Passes;
-            foreach (EffectPass pass in effectPassCollection)
+            Effect.World = Matrix.Identity;
+            Effect.View = TestCamera.View;
+            Effect.Projection = TestCamera.Projection;
+            foreach (EffectPass pass in Effect.CurrentTechnique.Passes)
             {
                 pass.Apply();
 
-                GraphicsDevice.DrawIndexedPrimitives(
-                        // We’ll be rendering one triangles.
-                        PrimitiveType.TriangleList,
-                        // The offset, which is 0 since we want to start at the beginning of the Vertices array.
-                        0,
-                        // The start index in the Vertices array.
-                        0,
-                        // The number of triangles to draw.
-                        2);
+                GraphicsDevice.DrawIndexedPrimitives(PrimitiveType.TriangleList, 0, 0, 2);
             }
         }
 
