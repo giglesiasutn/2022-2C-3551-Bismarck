@@ -25,8 +25,9 @@ namespace TGC.MonoGame.TP
         public const string ContentFolderSpriteFonts = "SpriteFonts/";
         public const string ContentFolderTextures = "Textures/";
 
-        public const float ShipMaxSpeed = 400.0f;
-        public const float ShipMinSpeed = -200.0f; //Negativo para que tenga reversa
+        public const float ShipMaxSpeed = 200.0f; //Positivo para que tenga reversa
+        public const float ShipMinSpeed = -400.0f; //
+        //Verificar luegoo esto en internet, se supone que el motor de un Barco entrega la misma potencia para ambos sentidos
         public const float ShipAcceleration = 80.0f;
         public const float ShipAngularSpeed = (float)Math.PI / 64/32;
 
@@ -119,7 +120,7 @@ namespace TGC.MonoGame.TP
             loadShips();
             loadSea();
 
-            ShipWorld = Matrix.CreateScale(0.05f);
+            ShipWorld = Matrix.CreateScale(0.05f) * Matrix.CreateRotationX(180);
 
             base.LoadContent();
         }
@@ -139,10 +140,10 @@ namespace TGC.MonoGame.TP
             Effect.VertexColorEnabled = true;
             var triangleVertices = new[]
             {
-                new VertexPositionColor(new Vector3(-MapSize, 0, -MapSize), Color.Blue),
-                new VertexPositionColor(new Vector3(-MapSize, 0, MapSize), Color.Blue),
-                new VertexPositionColor(new Vector3(MapSize, 0, -MapSize), Color.Blue),
-                new VertexPositionColor(new Vector3(MapSize, 0, MapSize), Color.Blue)
+                new VertexPositionColor(new Vector3(-MapSize, -100, -MapSize), Color.Blue),
+                new VertexPositionColor(new Vector3(-MapSize, -100, MapSize), Color.Blue),
+                new VertexPositionColor(new Vector3(MapSize, -100, -MapSize), Color.Blue),
+                new VertexPositionColor(new Vector3(MapSize, -100, MapSize), Color.Blue)
             };
 
             seaVertexBuffer = new VertexBuffer(GraphicsDevice, VertexPositionColor.VertexDeclaration, triangleVertices.Length,
@@ -247,18 +248,18 @@ namespace TGC.MonoGame.TP
             //previousPosition.Y = IslandInitialY; //Prueba para que no titile el barco
 
             //Giros
-            if (keyboardState.IsKeyDown(Keys.D))
-                rotationY += ShipAngularSpeed * elapsedTime * -1.0f * ShipCurrentSpeed;
             if (keyboardState.IsKeyDown(Keys.A))
+                rotationY += ShipAngularSpeed * elapsedTime * -1.0f * ShipCurrentSpeed;
+            if (keyboardState.IsKeyDown(Keys.D))
                 rotationY += ShipAngularSpeed * elapsedTime * ShipCurrentSpeed;
 
             ShipWorld = Matrix.CreateScale(0.05f) * Matrix.CreateRotationY(rotationY);
 
             //Aceleracion y desaleracion (+marcha atras)
             if (keyboardState.IsKeyDown(Keys.W))
-                ShipCurrentSpeed += ShipAcceleration * elapsedTime;
-            else if (keyboardState.IsKeyDown(Keys.S))
                 ShipCurrentSpeed -= ShipAcceleration * elapsedTime;
+            else if (keyboardState.IsKeyDown(Keys.S))
+                ShipCurrentSpeed += ShipAcceleration * elapsedTime;
             else
             {
                 //Para que desacelere solo al dejar de avanzar o retroceder
