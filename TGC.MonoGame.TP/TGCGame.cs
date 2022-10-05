@@ -4,11 +4,14 @@ using System.Drawing;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using BepuPhysics;
+using BepuPhysics.Collidables;
 using Bismarck;
 using Bismarck.Cameras;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using TGC.MonoGame.Samples.Geometries;
+using TGC.MonoGame.Samples.Samples.Shaders.SkyBox;
 using Color = Microsoft.Xna.Framework.Color;
 
 namespace TGC.MonoGame.TP
@@ -37,6 +40,8 @@ namespace TGC.MonoGame.TP
         public const float IslandSize = 15000;
         public const float ShipSize = 5000;
         public const Int32 MapSize = 100000;
+        public const Int32 SeaY = -100;
+        public const Int32 SeaTrianglesCount = 20;
         /// <summary>
         ///     Constructor del juego.
         /// </summary>
@@ -55,6 +60,7 @@ namespace TGC.MonoGame.TP
         private GraphicsDeviceManager Graphics { get; }
         private Model ShipModel { get; set; }
         private BasicEffect Effect { get; set; }
+        private Effect seaEffect { get; set; }
         private float Rotation { get; set; }
         private Matrix ShipWorld { get; set; }
 
@@ -70,14 +76,17 @@ namespace TGC.MonoGame.TP
         private List<Matrix> ShipsBWords = new List<Matrix>();
 
         private List<MatrixModel> MundoMatrixModel = new List<MatrixModel>();
+        private SkyBox SkyBox { get; set; }
 
         private Camera TestCamera { get; set; }
         private VertexBuffer seaVertexBuffer { get; set; }
         private IndexBuffer seaVertexIndex { get; set; }
 
+        private List<TrianglePrimitive> seaTriangles { get; set; }
 
         private float ShipCurrentSpeed;
         private float rotationY;
+        private float time;
 
         /// <summary>
         ///     Se llama una sola vez, al principio cuando se ejecuta el ejemplo.
@@ -106,6 +115,7 @@ namespace TGC.MonoGame.TP
             size.Y /= 2;
             TestCamera = new FreeCamera(GraphicsDevice.Viewport.AspectRatio, new Vector3(0, 50, 1000), size);*/
 
+            time = 0;
             // Inicializo velocidad
             ShipCurrentSpeed = 0;
             rotationY = 0.0f;
@@ -121,6 +131,7 @@ namespace TGC.MonoGame.TP
         protected override void LoadContent()
         {
             // Cargo el modelos a utilizar
+            loadSkybox();
             loadModels();
             loadModeloMatrix(IslandModel,20);
             loadModeloMatrix(IslandModel2, 20);
@@ -128,10 +139,20 @@ namespace TGC.MonoGame.TP
             loadModeloMatrix(ShipBModel, 40);
             //loadShips();
             loadSea();
+            seaEffect = Content.Load<Effect>(ContentFolderEffects + "SeaShader");
+            seaEffect.Parameters["DiffuseColor"].SetValue(Color.Blue.ToVector3());
 
             ShipWorld = Matrix.CreateScale(0.05f) * Matrix.CreateRotationX(180);
 
             base.LoadContent();
+        }
+
+        private void loadSkybox()
+        {
+            var skyBox = Content.Load<Model>(ContentFolder3D + "skybox/cube");
+            var skyBoxTexture = Content.Load<TextureCube>(ContentFolderTextures + "/skybox");
+            var skyBoxEffect = Content.Load<Effect>(ContentFolderEffects + "SkyBox");
+            SkyBox = new SkyBox(skyBox, skyBoxTexture, skyBoxEffect);
         }
         
         private void loadModels() {
@@ -147,7 +168,7 @@ namespace TGC.MonoGame.TP
         {
             Effect = new BasicEffect(GraphicsDevice);
             Effect.VertexColorEnabled = true;
-            var triangleVertices = new[]
+            /*var triangleVertices = new[]
             {
                 new VertexPositionColor(new Vector3(-MapSize, -100, -MapSize), Color.Blue),
                 new VertexPositionColor(new Vector3(-MapSize, -100, MapSize), Color.Blue),
@@ -166,7 +187,27 @@ namespace TGC.MonoGame.TP
             };
 
             seaVertexIndex = new IndexBuffer(GraphicsDevice, IndexElementSize.SixteenBits, triangleIndices.Length, BufferUsage.None);
-            seaVertexIndex.SetData(triangleIndices);
+            seaVertexIndex.SetData(triangleIndices);*/
+            seaTriangles = new List<TrianglePrimitive>();
+            /*seaTriangles.Add(new TrianglePrimitive(GraphicsDevice, new Vector3(-MapSize, SeaY, -MapSize), new Vector3(-MapSize, SeaY, MapSize),
+                new Vector3(MapSize, SeaY, -MapSize), Color.Blue, Color.Blue, Color.Blue));
+            seaTriangles.Add(new TrianglePrimitive(GraphicsDevice, new Vector3(MapSize, SeaY, MapSize), new Vector3(-MapSize, SeaY, MapSize),
+                new Vector3(MapSize, SeaY, -MapSize), Color.Blue, Color.Blue, Color.Blue));*/
+            Int32 squareSize = MapSize / SeaTrianglesCount;
+            for (int i = 0; i < SeaTrianglesCount * 2; i++)
+            {
+                for (int j = 0; j < SeaTrianglesCount * 2; j++)
+                {
+                    int x1 = -MapSize + i * squareSize;
+                    int x2 = -MapSize + (i + 1) * squareSize;
+                    int z1 = -MapSize + j * squareSize;
+                    int z2 = -MapSize + (j + 1) * squareSize;
+                    seaTriangles.Add(new TrianglePrimitive(GraphicsDevice, new Vector3(x1, SeaY, z1), new Vector3(x2, SeaY, z1),
+                        new Vector3(x1, SeaY, z2), Color.Blue, Color.Cyan, Color.Red));
+                    seaTriangles.Add(new TrianglePrimitive(GraphicsDevice, new Vector3(x2, SeaY, z1), new Vector3(x2, SeaY, z2),
+                        new Vector3(x1, SeaY, z2), Color.Blue, Color.Cyan, Color.Red));
+                }
+            }
         }
 
         private bool isInSquare(Vector3 center, float squareSize, float x, float z)
@@ -331,7 +372,7 @@ namespace TGC.MonoGame.TP
             // Aca deberiamos poner toda la logia de renderizado del juego.
             GraphicsDevice.Clear(Color.Cyan);
 
-            drawSea();
+            drawSea(gameTime);
 
             ShipModel.Draw(ShipWorld, FollowCamera.View, FollowCamera.Projection);
             /*
@@ -362,11 +403,12 @@ namespace TGC.MonoGame.TP
                 modelExistente.Draw(matrixExistente * Matrix.CreateScale(escala), FollowCamera.View, FollowCamera.Projection);
             }
 
+            SkyBox.Draw(FollowCamera.View, FollowCamera.Projection, ShipWorld.Translation);
         }
 
-        private void drawSea()
+        private void drawSea(GameTime gameTime)
         {
-            GraphicsDevice.SetVertexBuffer(seaVertexBuffer);
+            /*GraphicsDevice.SetVertexBuffer(seaVertexBuffer);
             GraphicsDevice.Indices = seaVertexIndex;
             Effect.World = Matrix.Identity;
             Effect.View = FollowCamera.View;
@@ -376,6 +418,23 @@ namespace TGC.MonoGame.TP
                 pass.Apply();
 
                 GraphicsDevice.DrawIndexedPrimitives(PrimitiveType.TriangleList, 0, 0, 2);
+            }*/
+            time += Convert.ToSingle(gameTime.ElapsedGameTime.TotalSeconds);
+
+            foreach (TrianglePrimitive t in seaTriangles)
+            {
+                /*var triangleEffect = t.Effect;
+                triangleEffect.World = Matrix.Identity;
+                triangleEffect.View = FollowCamera.View;
+                triangleEffect.Projection = FollowCamera.Projection;
+                triangleEffect.LightingEnabled = false;
+                t.Draw(triangleEffect);*/
+                seaEffect.Parameters["World"].SetValue(Matrix.Identity);
+                seaEffect.Parameters["View"].SetValue(FollowCamera.View);
+                seaEffect.Parameters["Projection"].SetValue(FollowCamera.Projection);
+                seaEffect.Parameters["Time"].SetValue(time);
+                seaEffect.Parameters["Atenuacion"].SetValue(0.8f);
+                t.Draw(seaEffect);
             }
         }
 

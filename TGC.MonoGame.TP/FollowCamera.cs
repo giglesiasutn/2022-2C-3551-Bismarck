@@ -25,6 +25,7 @@ namespace TGC.MonoGame.TP
         private float RightVectorInterpolator { get; set; } = 0f;
 
         private Vector3 PastRightVector { get; set; } = Vector3.Right;
+        public Vector3 offsetedPosition { get; set; }
 
         /// <summary>
         /// Crea una FollowCamera que sigue a una matriz de mundo
@@ -82,7 +83,7 @@ namespace TGC.MonoGame.TP
             
             // Calculo la posicion del a camara
             // tomo la posicion que estoy siguiendo, agrego un offset en los ejes Y y Derecha
-            var offsetedPosition = followedPosition 
+            offsetedPosition = followedPosition 
                 + CurrentRightVector * AxisDistanceToTarget
                 + Vector3.Up * AxisDistanceToTarget;
 
